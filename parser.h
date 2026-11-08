@@ -1,10 +1,18 @@
 #pragma once
 
+#include <stdbool.h>
+
+#define MAX_BINARY_SIZE 256
+
 typedef unsigned char u8;
 
-u8 final_binary[255];
+extern u8 final_binary[MAX_BINARY_SIZE];
 
-void parse_lines();
+bool parse_lines();
+
+int get_binary_size();
 
 void print_binary();
+
+void write_binary(char *file_name);
 

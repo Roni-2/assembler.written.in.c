@@ -4,20 +4,24 @@
 #include <string.h>
 #include "scanner.h"
 
+Token tokens[MAX_TOKENS];
+
 void read_file(char *filename, char **buffer) {
   long length;
   FILE *f = fopen(filename, "rb");
   if (f == NULL) {
+    printf("Could not open file %s\n", filename);
     exit(1);
   }
   fseek(f, 0, SEEK_END);
   length = ftell(f);
   fseek(f, 0, SEEK_SET);
-  *buffer = malloc(length);
-  if (buffer == NULL) {
+  *buffer = malloc(length + 1);
+  if (*buffer == NULL) {
     exit(2);
   }
   fread(*buffer, 1, length, f);
+  (*buffer)[length] = '\0'; 
   fclose(f);
 }
 
@@ -59,9 +63,19 @@ Token create_token(TokenType type, int value) {
   return token;
 }
 
+void consume_comment() {
+  while (peek_char() != '\n' && peek_char() != '\0') {
+    consume_char();
+  }
+}
+
 void consume_whitespace() {
   while (true) {
     char c = peek_char();
+    if (c == ';') {
+      consume_comment();
+      continue;
+    }
     if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
       return;
     if (c == '\n')
@@ -86,7 +100,8 @@ Token create_int(char c) {
   int result = c - '0';
   while (is_digit(peek_char())) {
     c = consume_char();
-    result = (result * 10) + (c - '0'); // append the digit c to result
+    if (result < 100000)
+      result = (result * 10) + (c - '0'); 
   }
   return create_token(TOKEN_INTEGER, result);
 }
@@ -108,6 +123,24 @@ Token create_identifier() {
 
   if (is_token_equal_to("mov"))
     return create_token(TOKEN_MOV, 0);
+  if (is_token_equal_to("not"))
+    return create_token(TOKEN_NOT, 0);
+  if (is_token_equal_to("const"))
+    return create_token(TOKEN_CONST, 0);
+  if (is_token_equal_to("or"))
+    return create_token(TOKEN_ALU, 0);
+  if (is_token_equal_to("add"))
+    return create_token(TOKEN_ALU, 1);
+  if (is_token_equal_to("sub"))
+    return create_token(TOKEN_ALU, 2);
+  if (is_token_equal_to("nand"))
+    return create_token(TOKEN_ALU, 3);
+  if (is_token_equal_to("and"))
+    return create_token(TOKEN_ALU, 4);
+  if (is_token_equal_to("xor"))
+    return create_token(TOKEN_ALU, 6);
+  if (is_token_equal_to("eq"))
+    return create_token(TOKEN_ALU, 7);
   if (is_token_equal_to("reg1"))
     return create_token(TOKEN_REGISTER, 1);
   if (is_token_equal_to("reg2"))
@@ -121,8 +154,7 @@ Token create_identifier() {
   if (is_token_equal_to("reg6"))
     return create_token(TOKEN_REGISTER, 6);
 
-  printf("Compile error on line %d: unknown identifier.\n", scanner.line);
-  exit(1);
+  return create_token(TOKEN_IDENTIFIER, 0);
 }
 
 Token scan_token() {
@@ -133,19 +165,27 @@ Token scan_token() {
 
   if (c == ',')
     return create_token(TOKEN_COMMA, 0);
+  if (c == '=')
+    return create_token(TOKEN_EQUALS, 0);
+  if (c == '[')
+    return create_token(TOKEN_LEFT_BRACKET, 0);
+  if (c == ']')
+    return create_token(TOKEN_RIGHT_BRACKET, 0);
   if (is_digit(c))
     return create_int(c);
   if (is_alpha(c))
     return create_identifier();
   if (c == '\0')
     return create_token(TOKEN_EOF, 0);
-
-  printf("Compile error on line %d: Unexpected character '%c'.\n", scanner.line, c);
-  exit(1);
+  return create_token(TOKEN_UNKNOWN, 0);
 }
 
 void scan_tokens() {
   for (int i=0; true; i++) {
+    if (i == MAX_TOKENS) {
+      printf("Compile error: file has too many tokens, the limit is %d.\n", MAX_TOKENS);
+      exit(1);
+    }
     tokens[i] = scan_token();
     if (tokens[i].type == TOKEN_EOF)
       return;
